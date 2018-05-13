@@ -107,17 +107,29 @@ irisNest
 + `purrr::map` is equivalent to `lapply`.
 
 ```{r}
-irisModels = irisNest %>% 
-  mutate(
-    olsModels = purrr::map(
-      .x = data,
-      .f = ~ lm(Petal.Length ~ .,
-                data = .x)
-    )
-  )
+olsModels = purrr::map(
+  .x = irisNest$data,
+  .f = ~ lm(Petal.Length ~ .,
+            data = .x)
+)
 
-irisModels
+olsModels
 ```
+
+
+
+<!-- ```{r} -->
+<!-- irisModels = irisNest %>% -->
+<!--   mutate( -->
+<!--     olsModels = purrr::map( -->
+<!--       .x = data, -->
+<!--       .f = ~ lm(Petal.Length ~ ., -->
+<!--                 data = .x) -->
+<!--     ) -->
+<!--   ) -->
+
+<!-- irisModels -->
+<!-- ``` -->
 
 
 ## Why use `purrr::map`?
@@ -129,15 +141,52 @@ irisModels
 + `purrr` is also smart!
 
 ```{r}
-lapply(irisModels$olsModels, function(x){x$coefficients})
+lapply(olsModels, function(x){x$coefficients})
 
-purrr::map(irisModels$olsModels, "coefficients")
+purrr::map(olsModels, "coefficients")
 
-purrr::map_dbl(irisModels$olsModels, stats::AIC)
+purrr::map_dbl(olsModels, stats::AIC)
 ```
 
 
+
+
 # Put this all together, you have a very powerful framework to manage your data
+
+## Each column of a tibble is a list
+```{r}
+rlmModels = purrr::map(
+  .x = irisNest$data,
+  .f = ~ MASS::rlm(Petal.Length ~ .,
+                   data = .x))
+
+irisModels = irisNest %>%
+  mutate(
+    olsModels = olsModels,
+    rlmModels = rlmModels
+  )
+
+irisModels
+```
+
+
+## And the columns can keep growing
+```{r}
+irisCorrelations = irisModels %>%
+  mutate(
+    olsModels_fitted = purrr::map(olsModels, "fitted.values"),
+    rlmModels_fitted = purrr::map(rlmModels, "fitted.values"),
+    cor_ols_rlm = map2_dbl(
+      .x = olsModels_fitted, 
+      .y = rlmModels_fitted, 
+      .f = cor)
+  )
+
+irisCorrelations
+```
+
+
+
 
 
 ## Example: PCA on `iris1` data
@@ -201,7 +250,7 @@ do.call(gridExtra::arrangeGrob, datavis.tibble$plots) %>% plot
 
 # Final advice
 
-## Final advice
+## Final advice {.build}
 
 + Some of these tools are very advanced in terms of notations and programming practice.
 + You should pick up small snipets of code here and there first before building a framework straight the way. 
