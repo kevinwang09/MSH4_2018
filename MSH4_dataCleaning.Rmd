@@ -39,17 +39,13 @@ content: '';
 
 + Some cheatsheets: https://www.rstudio.com/resources/cheatsheets/.
 
-+ There is an interactive tutorial on `ggplot2`. Just run the following code. 
++ There is an interactive tutorial on `ggplot2`. https://garthtarr.shinyapps.io/ggplot2_basic_tutorial/
 
 ```{r, eval = F}
 ## Might be a while...
-
 install.packages("tidyverse") 
 install.packages(c("ggplot2","dplyr", "readr","tidyr","janitor","plotly",
-                   "devtools","learnr","gapminder", "e1071")) 
-
-library(devtools)
-install_github("kevinwang09/2017_STAT3914", subdir = "learnr3914")
+                   "devtools","learnr","gapminder", "e1071"))
 ```
 
 
