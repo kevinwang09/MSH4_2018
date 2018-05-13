@@ -1,0 +1,208 @@
+---
+title: "Advanced `tidyverse`"
+author: '[Kevin Y. X. Wang](http://www.maths.usyd.edu.au/ut/people?who=KY_Wang&sms=y)'
+date: "10 May 2018"
+output:
+  ioslides_presentation:
+    fig_height: 10
+    fig_width: 10
+    incremental: yes
+    self_contained: yes
+    transition: faster
+    widescreen: yes
+    smaller: true
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+
+options(tibble.print_max = 10, tibble.print_min = 5)
+```
+
+
+
+<style>
+slides > slide { overflow: scroll; }
+slides > slide:not(.nobackground):after {
+content: '';
+}
+</style>
+
+
+
+# Tidy data
+
+## It is not just about data frames {.build}
+
++ "Tidy data" isn't just cleaned data. You should think about the structure of the data and the resulting objects. 
+
++ In research, we often perform the **same** algorithms/functions to data with **similar** structures, using different **parameter values**.
+
++ The traditional way of doing this is to have `original.data`, `original.data.param1.algo1`, `original.data.param1.algo2` as separate objects. 
+
+```{r}
+ols.Setosa = lm(Petal.Length ~ ., 
+                data = iris %>% 
+                  filter(Species == "setosa") %>% 
+                  select(-Species))
+ols.Versicolor = lm(Petal.Length ~ ., 
+                    data = iris %>% 
+                      filter(Species == "versicolor") %>% 
+                      select(-Species))
+ols.Virginica = lm(Petal.Length ~ ., 
+                   data = iris %>% 
+                     filter(Species == "virginica") %>% 
+                     select(-Species))
+
+ols.Setosa$coefficients
+ols.Versicolor$coefficients
+ols.Virginica$coefficients
+# robustLm.Length = lmrob(Petal.Length ~ Sepal.Length, data = iris)
+```
+
+
+## `for` loop vs `list` {.build}
+
++ Of course, if you know the structure of your data well eonugh, you could do looping so you shouldn't type everything out. But this could be slow. 
+
++ If you are a bit fancy, you could use `lapply` and `mapply` functions. However, as the complexity of your pipeline grows, you need to have better naming conventions and ever longer list of objects to keep tract of. And let's don't forget, matching between objects can be a nightmare!
+
+```{r}
+olsSpecies = c()
+for(i in unique(iris$Species)){
+  olsSpecies[[i]] =  lm(Petal.Length ~ ., 
+                        data = iris %>% 
+                          filter(Species == i) %>% 
+                          select(-Species))
+  
+}
+olsSpecies
+```
+
+
+
+# Think about the structure 
+
+## First step: all we need is to split the data into 3 parts 
+
++ `tidyr::nest` is a powerful function for spliting data.
+
++ Here is where `tibble` is become tremendously powerful.
+
+```{r}
+irisNest = iris %>% 
+  dplyr::group_by(Species) %>% 
+  tidyr::nest()
+
+irisNest
+```
+
+
+## Second step: fit a linear model to `irisNest$data` column
+
++ We could use `lapply` here. But sometimes, it isn't the best option due to cumbersome notations. 
+
++ `purrr::map` is equivalent to `lapply`.
+
+```{r}
+irisModels = irisNest %>% 
+  mutate(
+    olsModels = purrr::map(
+      .x = data,
+      .f = ~ lm(Petal.Length ~ .,
+                data = .x)
+    )
+  )
+
+irisModels
+```
+
+
+## Why use `purrr::map`?
+
++ `lapply` and `mapply` are fine. But they offer less control over the returned data types and they don't have a consistent argument input. 
+
++ `purrr::map` has consistent notations with its generalisation of `purrr::map2`.
+
++ `purrr` is also smart!
+
+```{r}
+lapply(irisModels$olsModels, function(x){x$coefficients})
+
+purrr::map(irisModels$olsModels, "coefficients")
+
+purrr::map_dbl(irisModels$olsModels, stats::AIC)
+```
+
+
+# Put this all together, you have a very powerful framework to manage your data
+
+
+## Example: PCA on `iris1` data
+```{r}
+iris.pca = prcomp(iris[,-5])$x 
+## We only want the PCs in our explorations
+
+pca.tibble = tibble(
+  Species = list(iris$Species),
+  pcaData = list(iris.pca),
+  k = 1:4
+)
+
+## We start with the data, and a set of different values of parameters
+pca.tibble
+```
+
+
+## Example: performing kmeans with various k
+
+```{r}
+kmeans.tibble = mutate(pca.tibble,
+                       pca_kmeans = purrr::map2(
+                         .x = pcaData,
+                         .y = k,
+                         .f = ~ kmeans(x = .x, centers = .y)$cluster)
+)
+kmeans.tibble
+```
+
+
+## Example: visualisating kmeans clustering on iris data
+```{r}
+datavis.tibble = mutate(
+  kmeans.tibble,
+  visData = map2(.x = pca_kmeans,
+                 .y = pcaData,
+                 .f = ~ data.frame(
+                   cluster = .x,
+                   .y)),
+  visData2 = map2(.x = visData, 
+                  .y = Species, 
+                  .f = ~ data.frame(
+                    .x, 
+                    Species = .y
+                  )),
+  plots = map(.x = visData2,
+              .f = ~ ggplot(.x) +
+                geom_point(aes(x = PC1,
+                               y = PC2,
+                               colour = as.factor(cluster))) +
+                facet_grid(cluster~Species) +
+                theme(legend.position = "bottom")
+  )
+)
+datavis.tibble %>% print(width = Inf)
+# datavis.tibble$plots
+do.call(gridExtra::arrangeGrob, datavis.tibble$plots) %>% plot
+```
+
+
+# Final advice
+
+## Final advice
+
++ Some of these tools are very advanced in terms of notations and programming practice.
++ You should pick up small snipets of code here and there first before building a framework straight the way. 
++ E.g. As much as I enjoy using `purrr::map`, I still use `lapply` in some cases. I don't code everything in `tibble` either, only when the structure of the data gets too complex. 

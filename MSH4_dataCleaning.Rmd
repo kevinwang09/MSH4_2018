@@ -1,0 +1,396 @@
+---
+title: "Data exploration with `tidyverse`"
+author: '[Kevin Y. X. Wang](http://www.maths.usyd.edu.au/ut/people?who=KY_Wang&sms=y)'
+date: "10 May 2018"
+output:
+  ioslides_presentation:
+    fig_height: 3
+    fig_width: 4
+    incremental: yes
+    self_contained: yes
+    transition: faster
+    widescreen: yes
+    smaller: true
+always_allow_html: yes
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+
+options(tibble.print_max = 10, tibble.print_min = 5)
+```
+
+
+
+<style>
+slides > slide { overflow: scroll; }
+slides > slide:not(.nobackground):after {
+content: '';
+}
+</style>
+
+
+
+
+## Preparing for this lecture {.build}
+
++ All materials are on https://github.com/kevinwang09/MSH4_2018 and https://github.com/kevinwang09/2017_STAT3914. 
+
++ Some cheatsheets: https://www.rstudio.com/resources/cheatsheets/.
+
++ There is an interactive tutorial on `ggplot2`. Just run the following code. 
+
+```{r, eval = F}
+## Might be a while...
+
+install.packages("tidyverse") 
+install.packages(c("ggplot2","dplyr", "readr","tidyr","janitor","plotly",
+                   "devtools","learnr","gapminder", "e1071")) 
+
+library(devtools)
+install_github("kevinwang09/2017_STAT3914", subdir = "learnr3914")
+```
+
+
+
+## Why am I here? 
+
++ ~~I served at the commands of Jean~~.
+
++ Everything I am telling you today has an equivalent solution in base `R`. 
+
++ So why am I even here? 
+
+
+## What is the aim of this lecture? {.build}
+
++ Certain tasks in `R` used to be very difficult. Especially data cleaning and manipulations. 
+
++ For example, how would you calculate the mean of `Sepal.Length`, `Sepal.Width`, `Petal.Length`, `Petal.Width` in the `iris` dataset?
+
+```{r}
+head(iris, 3)
+mean(iris$Sepal.Length)
+mean(iris$Sepal.Width)
+```
+
++ I am too lazy to type... But I think you get the idea...
+
+## What about the grouped means? {.build}
+
++ Dear me... This is too much typing!!
+
+```{r}
+tapply(iris$Sepal.Length, iris$Species, mean)
+tapply(iris$Sepal.Width, iris$Species, mean)
+```
+
+
+## You are not alone in hating all these typing! {.build}
+
++ The `tidyverse` is a coherent collection of packages for data manipulation, exploration and visualisation that share a common design philosophy.
+
+1.  Data should be managed in `data.frame`.
+2.  The `data.frame` should be easy to manipulate.
+3.  Each row should be an observation and each column should be a column. 
+
++ The `tidyverse` solution for calculating group means: the process of calculating mean is identical. 
+
++ All we need to do is to apply this process to each `numeric` column of `iris`. 
+```{r}
+iris %>%
+  summarise_if(is.numeric, mean)
+```
+
++ To caluclate grouped mean: identical to before, but we need to apply the mean to the `Species` grouping first! 
+
+```{r}
+iris %>%
+  group_by(Species) %>%
+  summarise_if(is.numeric, mean)
+```
+
+
+
+## `tidyverse` is a collection of packages {.build}
+
++ Reading in data using `readr` and `readxl`
++ Better than data.frame: `tibble` 
++ Basic data cleaning using `janitor`
++ Clean coding using `magrittr`
++ Data filtering using `dplyr`
++ Data visualisation using `ggplot2`
+
+
+# Reading in data
+
+## `readr` for basic data types and `readxl` for .xlsx files {.build}
+
++ I know some of you are using this already.
++ Parsing warnings.
++ NEVER read in factors.
+
+```{r}
+rawEyData = read_csv("EY-data-science-challenge-pack/train.csv",
+                     guess_max = 10, ## use the first 10 rows to guess the variable type
+                     progress = TRUE ## If the data is large, a progress bar will be shown
+)
+```
+
+
+# tibble
+
+
+## `tibble` is more advanced data.frame
+
++ There is a super advanced way of using `tibble`, see another set of slides. 
+
+```{r}
+class(rawEyData)
+rawEyData
+```
+
+
+# Janitor
+
+## Consistent naming of columns
+
++ This is perhaps the most useful function in `janitor`.
+
+```{r}
+eyData = janitor::clean_names(rawEyData)
+eyData
+```
+
+## Tabulate in style
+
++ Sometimes you want to calculate counts as well as percentages. 
+
+```{r}
+eyData %>% 
+  janitor::tabyl(location, gender) %>% 
+  janitor::adorn_percentages() %>% 
+  janitor::adorn_ns()
+```
+
+
+
+# Magrittr
+
+
+## `base` R coding: read from inside the brackets {.build}
+
++ It can get messy very quickly. 
+
++ WORSE: You might not know what you are doing if you are not paying attention!
+
+```{r}
+plot(density(na.omit(eyData$edu_tertiary_pc_wkgpop), kernel = "gaussian"), col = "red")
+```
+
+## Piping ` %>% ` is about making your code readable to humans {.build}
+
++ **`base`**: `f(x)` means applying `f` on an object, `x`. 
++ **`magrittr`**: `x %>% f` means starting off with an object `x` and apply `f` upon it. 
++ Allows people to read codes from left to right.
++ Each function's option is within the righ bracket.
+
+```{r}
+mean(eyData$edu_tertiary_pc_wkgpop, na.rm = TRUE)
+
+eyData$edu_tertiary_pc_wkgpop %>% 
+  mean(na.rm = TRUE)
+```
+
+
+## The use of the `.` {.build}
+
+```{r, echo = FALSE}
+set.seed(1)
+```
+
++ The `.` is a placeholder for everything before the pipe. 
++ It allows you to specify how and where the previous inputs should be used
+
+```{r}
+args(rnorm)
+5 %>% rnorm(n = .)
+5 %>% rnorm(n = 1, mean = .)
+```
+
+
+## The density plot revisited {.build}
+
++ It is **identical** to the previous density plot, but now it is much more readable for a human!
+
+```{r}
+eyData$edu_tertiary_pc_wkgpop %>% 
+  na.omit %>% 
+  density(kernel = "gaussian") %>% 
+  plot(col = "red")
+```
+
+# `dplyr`
+
+
+## Have you ever thought about `[,]`?
+
++ `base` R use `[,]` to subset data. 
++ But if you really think about it, why are we using the one symbol for two operations (**row**, **column**)?
+
+```{r}
+eyData[,c("id", "location")]
+eyData[eyData$location == "AUS",]
+```
+
+
+
+## `dplyr` is a super way to manipulate your data {.build}
+
++ Think of subsetting rows and columns as two **separate different procedures**:
+- `select` columns are operations on variables, and 
+- `filter` rows are operations on observations
+
+```{r}
+eyData %>% select(id, location)
+eyData %>% filter(location == "AUS")
+```
+
+## So what?? {.build}
+
++ Sure, you could stick with the `base` command. 
+
++ But sometimes, you realise that you could do something more powerful! (Notice how this would require a `for` loop or saving intermediate variables to achieve in `base`).
+
+```{r}
+eyData %>%
+  filter(location == "AUS") %>%
+  select(contains("population_ages"))
+```
+
+## `mutate` {.build}
+
++ How would you add in an extra column in a data?
++ And what if you want to add in a second column that is a transformation of the first column?
+
+```{r, eval = FALSE}
+eyData$gdp_aud_cap = eyData$gdp_usd_cap * 0.75
+eyData$gdp_aud_cap_billions = eyData$gdp_aud_cap/1000
+```
+
++ `mutate` allows you to do this in one function!
+
+```{r}
+eyData %>% 
+  mutate(
+    gdp_aud_cap = gdp_usd_cap*0.75,
+    gdp_aud_cap_billions = gdp_aud_cap/1000
+  )
+```
+
+
+## Summarise {.build}
+
++ Similar to `tapply`, but more flexible
+
+```{r}
+eyData %>% 
+  group_by(location) %>% 
+  summarise(
+    medianQol = median(quality_of_life_measure),
+    meanQol = mean(quality_of_life_measure)
+  )
+
+eyData %>% 
+  group_by(location, time) %>% 
+  summarise(medianQol = median(quality_of_life_measure))
+```
+
+
+
+# `ggplot2`
+
+## I can't explain to you how to do a ggplot, you must learn it
+
++ *gg* stands for grammar of graphics. Which means, there is a consistent way to produce a graph. 
+
++ Advice through pain and tears: use `base` graphs if you can get it working very quickly (e.g. scatter plot or boxplot). Use `ggplot2` if your graph will inevitabily get complex. 
+
++ Legend!!! 
+
+```{r}
+eyData %>% 
+  filter(location %in% c("AUS", "GBR", "SWE", "JPN")) %>%
+  ggplot(aes(x = time,
+             y = quality_of_life_measure,
+             colour = gender)) +
+  geom_point() + 
+  geom_line() +
+  facet_wrap(~location, nrow = 2)
+```
+
+
+# `tidyr`
+
+## `tidyr` is a great companion with `ggplot2`
+
++ I know some of you used `reshape2::melt`. Which is a special case of `tidyr::gather`. The latter offers more control
+
+```{r}
+popAges = eyData %>% 
+  select(location, contains("population_ages"))
+
+popAges
+
+popAges %>% 
+  tidyr::gather(key = populationAgeGroups,
+                value = percentage,
+                -location)
+```
+
+
+## `separate` and `separate_rows` example: EY data dictionary
+```{r}
+dataDictionary = readxl::read_excel("EY-data-science-challenge-pack/Data Dictionary.xlsx")
+
+dataDictionary[1,]
+
+tmp = dataDictionary[1,] %>% 
+  tidyr::separate_rows(col = DESCRIPTION, sep = "; ")
+
+tmp
+
+countryNameData = tmp %>% 
+  tidyr::separate(col = DESCRIPTION, into = c("threeLetters", "countryName"), sep = " - ") %>% 
+  dplyr::select(threeLetters, countryName)
+
+countryNameData
+```
+
+
+## dplyr: Merging data
+
+```{r}
+eyData_joined = dplyr::left_join(eyData, 
+                                 countryNameData, 
+                                 by = c("location" = "threeLetters"))
+eyData_joined
+```
+
+
+
+# `stringr`
+
+## Not much I can say about this
+
++ The main criticism of base R string manipulation is the inconsistent arguments. 
+
+```{r}
+args(grep)
+args(gsub)
+
+args(stringr::str_detect)
+args(stringr::str_replace_all)
+```
+
